@@ -10,3 +10,6 @@ Fade.bat
    - collision detextion ; Algorithm based Implemetation of bounding box based collison test
    - non blocking input  ; utilizing an embedded exe utility
    - frame rate control  ; utilizing an algorithm to calculate time elapsed
+
+ Yahtzee.bat
+   An implementation of the game yahtzee. includes an embedded exe BG.exe to facilitate mouse input.
