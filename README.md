@@ -1,7 +1,7 @@
 # Batch
 A collection of batch scripts
 
-Fade.bat 
+# Fade.bat 
   An example script for sprite based batch games.
   Note: batch sprites are not bitmaps. They are realised using associated delayed variables
   Demonstrates:
@@ -11,5 +11,5 @@ Fade.bat
    - non blocking input  ; utilizing an embedded exe utility
    - frame rate control  ; utilizing an algorithm to calculate time elapsed
 
- Yahtzee.bat
+ # Yahtzee.bat
    An implementation of the game yahtzee. includes an embedded exe BG.exe to facilitate mouse input.
