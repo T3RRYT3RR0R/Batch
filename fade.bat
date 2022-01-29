@@ -50,10 +50,14 @@ REM Controls
  Mode %Width%,%Hieght%
  Set "Delay=4"
 
- Setlocal EnableDelayedExpansion
 
- REM Set "sprites=0"
- REM For /f Delims^= %%G in ('Set Sprite[')Do Set /A "sprites+=1"
+ %= Define non player sprite movement macros =%
+ Set sRight=Set /A "1/(S%%iRB/S%%iX)" ^&^& Set /A "S%%iLX=S%%iX","S%%iLY=S%%iY","S%%iX+=1" ^|^|Set /A "S%%iLX=S%%iX","S%%iLY=S%%iY"
+ Set sLeft= Set /A "1/(S%%iLB-S%%iX)" ^&^& Set /A "S%%iLX=S%%iX","S%%iLY=S%%iY","S%%iX-=1" ^|^|Set /A "S%%iLX=S%%iX","S%%iLY=S%%iY"
+ Set sUp=   Set /A "1/(S%%iUB-S%%iY)" ^&^& Set /A "S%%iLX=S%%iX","S%%iLY=S%%iY","S%%iY-=1" ^|^|Set /A "S%%iLX=S%%iX","S%%iLY=S%%iY"
+ Set sDown= Set /A "1/(S%%iBB/S%%iY)" ^&^& Set /A "S%%iLX=S%%iX","S%%iLY=S%%iY","S%%iY+=1" ^|^|Set /A "S%%iLX=S%%iX","S%%iLY=S%%iY"
+
+ Setlocal EnableDelayedExpansion
 
  Set "Gravity=N"
  Echo(Enable gravity Y/N?
@@ -73,15 +77,17 @@ REM Controls
  <nul Set /p "=%\E%[?25l%\E%[1;1H%\E%[48;2;!BG!m%\E%[38;2;!FG!m%\E%[2J%Sprite[1]%%Sprite[2]%%Sprite[3]%%Border%"
  Timeout /t 1 /NoBreak > nul
  
-
  2> nul (
   For /l %%. in () Do (
-   %= Title -!S1Y!,!S1X!-!Relative!-!S2Y!,!S2X! =%
    %= Calculate time elapsed =%
    for /f "tokens=1-4 delims=:.," %%a in ("!time: =0!") do set /a "t2=(((1%%a*60)+1%%b)*60+1%%c)*100+1%%d-36610100, tDiff=t2-t1"
    if !tDiff! lss 0 set /a tDiff+=24*60*60*100
+
    if !tDiff! geq !delay! (
+    <nul Set /p "=%Sprite[1]%%Sprite[2]%%Sprite[3]%"
     Set /A "BGc+=5","t1=t2","S1cR+=1"
+
+    %= Move sprites. Sprite 3 is defined as an example of basic patrolling =%
     For /L %%i in (2 1 !Sprites!)Do (
      If not %%i equ 3 (
       If !S%%iY! GTR !S1Y! ( Set /A "S%%iYd=S%%iY-S1Y" )Else Set /A "S%%iYd=S1Y-S%%iY"
@@ -94,22 +100,30 @@ REM Controls
        If !S%%iX! GTR !S1X! Set "S%%iDir=3"
        If !S%%iX! LSS !S1X! Set "S%%iDir=4"
       )
+      If !S%%iDir! EQU 1 %sUp%
+      If !S%%iDir! EQU 2 %sDown%
+      If !S%%iDir! EQU 3 %sLeft%
+      If !S%%iDir! EQU 4 %sRight%
      )
+     %= sprite 3 enaacted once for each defined non player sprite =%
      If !s3Dir! EQU 3 If !S3X! NEQ !S3LB! ( Set /A "S3LX=S3X","S3X-=1" )Else Set "s3Dir=4"
      If !s3Dir! EQU 4 If !S3X! NEQ !S3RB! ( Set /A "S3LX=S3X","S3X+=1" )Else Set "s3Dir=3"
-     ( Call:Move %%i !S%%iDir! ) || (
-      <nul set /p "=%Sprite[1]%%\E%[1;1H%\E%[48;2;!BG!m%\E%[38;2;!FG!m%\E%[0J%Sprite[1]%%Sprite[2]%%Sprite[3]%"
-      Echo(M|Choice > nul
-      Title Game over. Play Again Y/N?
-      Cls
-      Timeout /T 3 /Nobreak > nul
-      Endlocal
-      For /f "delims=" %%C in ('%SystemRoot%\System32\choice.exe /N /C:YN')Do if %%C==Y Start "" "%~f0"
-      Exit
+
+     %= test for collision =%
+                     %= If Base1 LSS Top2 =%       %= If Top1 GTR Base2 =%         %= If Right1 LSS Left2 =%     %= If Left1 GTR Right2 =%    %= If sum EQ 0 Collided =%
+     Set /A "Collide=(((S1Y+(S1H-1))-S%%iY)>>31) + (((S%%iY+(S%%iH-1))-S1Y)>>31) + (((S1X+S1W)-(S%%iX+1))>>31) + (((S%%iX+S%%iW)-1-S1X)>>31)","1/Collide" || (
+     	<nul set /p "=%Sprite[1]%%\E%[1;1H%\E%[48;2;!BG!m%\E%[38;2;!FG!m%\E%[0J%Sprite[1]%%Sprite[2]%%Sprite[3]%"
+     	Echo(M|Choice > nul
+     	Cls
+     	Timeout /T 2 /Nobreak > nul
+     	(Title )
+     	Endlocal
+     	Start "" "%~f0"
+     	Exit
      )
     )
-    If !BGc! GTR 250 Set "BGc=10"
     If !S1cR! GTR 250 Set "S1cR=50"
+    Rem If !BGc! GTR 250 Set "BGc=10"
     Rem Set "FG=!BGc!;!BGc!;!BGc!"
     Set "FG=50;!S1X!;!S1X!"
     Set "BG=!FG!"
@@ -117,13 +131,14 @@ REM Controls
      Set /A "S1LX=S1X","S1LY=S1Y",S1Y+=1"
      Set "Key=!LastXkey!"
     )
-    <nul set /p "=%\E%[1;1H%\E%[48;2;!BG!m%\E%[38;2;!FG!m%\E%[0J%Sprite[1]%%Sprite[2]%%Sprite[3]%"
    )
    %TEMP%\GetKey.exe /n
    If !errorlevel! EQU 27 Exit
    If not !Errorlevel! EQU 0 For %%v in (!Errorlevel!)Do If not "!k%%v!"=="" Set "key=!k%%v!"
    If "!Key!"=="Left" Set "LastXkey=Left"
    If "!Key!"=="Right" Set "LastXkey=Right"
+   If "!Key!"=="Up" Set "LastYkey=Up"
+   If "!Key!"=="Down" Set "LastYkey=Down"
    If Defined Key (
     If "!Key!"=="Up" %Up%
     If "!Key!"=="Down" %Down%
@@ -131,34 +146,12 @@ REM Controls
     If "!Key!"=="Right" %Right%
     If "!Key!"=="Jump" %Jump%
    )
+   <nul set /p "=%Sprite[1]%%\E%[1;1H%\E%[48;2;!BG!m%\E%[38;2;!FG!m%\E%[0J%Sprite[1]%%Sprite[2]%%Sprite[3]%"
   )
  )
 
- :Move Non player Sprite; enacts collision detection prior to movement. Returns collided sprite in errorlevel
-  REM Collision detection method - Bounding box; Application: Alogirthm based conditional Execution
-  REM See: http://devmag.org.za/2009/04/13/basic-collision-detection-in-2d-part-1/
-
-  REM Condition tests "((Sum)>>31)" return -1 if condition true ; 0 if false. If sum of conditions EQU 0 (IE: ALL conditions false; Collision true)
-  Set "NOTsafe=DeadAsBro"
-                  %= If Base1 LSS Top2 =%    %= If Top1 GTR Base2 =%         %= If Right1 LSS Left2 =%    %= If Left1 GTR Right2 =%
-  Set /A "Collide=(((S1Y+(S1H-1))-S%1Y)>>31) + (((S%1Y+(S%1H-1))-S1Y)>>31) + (((S1X+S1W)-(S%1X+1))>>31) + (((S%1X+S%1W)-1-S1X)>>31)","1/Collide" && Set "NOTsafe="
-  If Defined NOTsafe Exit /b %1
-  If not "%~3"=="" Exit /b 0
-
-  Set "UpdateSprite=!Sprite[%1]!"
-  If %2 EQU 1 Set "Move=!Up:S1=S%1!"
-  If %2 EQU 2 Set "Move=!Down:S1=S%1!"
-  If %2 EQU 3 Set "Move=!Left:S1=S%1!"
-  If %2 EQU 4 Set "Move=!Right:S1=S%1!"
-  <nul Set /p "=%UpdateSprite%"
-  %Move%
-
-  REM remove rem below to retest post sprite move
-  ( Call:Move %1 %2 retest ) || Exit /B !Errorlevel!
- Exit /b 0
-
-:DefSprite "CELLline\nCELLline" Y X H W "RR GG BB(foreground)" "RR GG BB(background)" [1|2|3|4]
-REM   Args 1                    2 3 4 5  6                      7                      8 (Starting Direction)
+ :DefSprite "CELLline\nCELLline" Y X H W "RR GG BB(foreground)" "RR GG BB(background)" [1|2|3|4]
+ REM   Args 1                    2 3 4 5  6                      7                      8 (Starting Direction)
 
  Set /A Sprites+=1
  Set "cells=%~1"
@@ -167,11 +160,10 @@ REM   Args 1                    2 3 4 5  6                      7               
  Set "FGcol=%~6"
  Set "BGcol=%~7"
  Set /A "S%Sprites%LY=%~2,S%Sprites%Y=%~2","S%Sprites%LX=%~3,S%Sprites%X=%~3","S%Sprites%H=SH","S%Sprites%W=SW"
- Set /A "S%Sprites%UB=2","S%Sprites%BBG=Hieght-SH","S%Sprites%BB=Hieght-SH-1","S%Sprites%LB=2","S%Sprites%RB=Width-SW-1"
+ Set /A "S%Sprites%UB=2","S%Sprites%BBG=Hieght-SH","S%Sprites%BB=Hieght-SH-1","S%Sprites%LB=2","S%Sprites%RB=Width-SW-1","S%Sprites%RBe=Width-SW"
  Call Set "cells=%%Cells:\n=!\E![!S%Sprites%X!G!\E![1B%%"
 
  Set "Sprite[%Sprites%]=!\E![!S%Sprites%LY!;!S%Sprites%LX!H!\E![48;2;!BG!m%\E%[38;2;!FG!m%Cells%!\E![!S%Sprites%Y!;!S%Sprites%X!H!\E![48;2;%BGcol%m!\E![38;2;%FGcol%m%Cells%!\E![0m"
-
  If not "%~8"=="" Set "S%Sprites%Dir=%~8"
 
 Exit /b 0
