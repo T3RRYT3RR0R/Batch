@@ -109,9 +109,9 @@ REM Controls
      If !s3Dir! EQU 3 If !S3X! NEQ !S3LB! ( Set /A "S3LX=S3X","S3X-=1" )Else Set "s3Dir=4"
      If !s3Dir! EQU 4 If !S3X! NEQ !S3RB! ( Set /A "S3LX=S3X","S3X+=1" )Else Set "s3Dir=3"
 
-     %= test for collision =%
-                     %= If Base1 LSS Top2 =%       %= If Top1 GTR Base2 =%         %= If Right1 LSS Left2 =%     %= If Left1 GTR Right2 =%    %= If sum EQ 0 Collided =%
-     Set /A "Collide=(((S1Y+(S1H-1))-S%%iY)>>31) + (((S%%iY+(S%%iH-1))-S1Y)>>31) + (((S1X+S1W)-(S%%iX+1))>>31) + (((S%%iX+S%%iW)-1-S1X)>>31)","1/Collide" || (
+     %= test for collision using Bitshifted Or algorithm assessing the following conditions =%
+               %=      If Base1 LSS Top2     =% %=     If Top1 GTR Base2       =% %=    If Right1 LSS Left2    =% %=    If Left1 GTR Right2     =%
+     Set /A "1/(((((S1Y+(S1H-1))-S%%iY)>>31)&1)|((((S%%iY+(S%%iH-1))-S1Y)>>31)&1)|((((S1X+S1W)-(S%%iX+1))>>31)&1)|((((S%%iX+S%%iW)-1-S1X)>>31)&1))" || (
      	<nul set /p "=%Sprite[1]%%\E%[1;1H%\E%[48;2;!BG!m%\E%[38;2;!FG!m%\E%[0J%Sprite[1]%%Sprite[2]%%Sprite[3]%"
      	Echo(M|Choice > nul
      	Cls
