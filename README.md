@@ -8,7 +8,7 @@ A collection of batch scripts
    - transparency        ; by matching sprite Background color definition to screen background color definition
    - fading              ; by modifying definitions of sprite or screen color variables between frames
    - collision detection ; Algorithm based Implemetation of bounding box based collison test
-   - non blocking input  ; utilizing an embedded exe utility
+   - non blocking input  ; utilizing multithreading and Pipes
    - frame rate control  ; utilizing an algorithm to calculate time elapsed
 
  # Yahtzee.bat
