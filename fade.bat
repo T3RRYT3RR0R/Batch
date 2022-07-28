@@ -139,7 +139,7 @@ Rem Use control function as input to game via pipline.
  :GAME
  Setlocal EnableDelayedExpansion
  <nul Set /p "=%\E%[?25l"
- 2> nul (				%= Suppress STDERR of condiitional equations =%
+ 2> nul (				%= Suppress STDERR of conditional equations =%
  	For /l %%. in () Do (	%= Enact Infinite Loop =%
 			
 		For /l %%# in (1 1 !Delay!) Do Rem %= Implement Delay Timing. =%
