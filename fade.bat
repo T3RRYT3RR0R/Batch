@@ -1,38 +1,66 @@
 @Echo off & Cls
+REM See this demo at: https://youtu.be/ph3SYsXvz-M
+REM Advanced sprite based high fps tutaorial / demo game
+REM Github: https://github.com/T3RRYT3RR0R/Batch/blob/main/fade.bat
+
+(Title )
+:Start
 
  If not "%~1"=="" Goto:%1
 
-REM See it at: https://youtu.be/ph3SYsXvz-M
+REM Signal file that the Controller uses to pass keypress to the game via without blocking execution.
+REM - Note - This is not a Lockfile: executing multiple instances of this script simultaneously is not supported.
+ Set "SignalFile=%TEMP%\%~n0_Signal.tmp"
+
+REM Signal file that the game uses to communicate an Exit signal to the controllor.
+ Del "%SignalFile:Signal=Stop%" 2> nul 1> nul
+
+REM Stores the active codepage for restoration upon game completion.
+ For /F "tokens=2 Delims=:" %%G in ('CHCP')Do >"%TEMP%\%~n0_restore.cmd" Echo(@CHCP %%G ^> nul
+
+REM Defines nonprintable characters used by this script.
+ Call :createChars
 
 Rem GetDelay routine gets a baseline of how many For /l iterations the pc executes per second
 Rem which is used to define the starting value of the delay rate. This approach permits higher fps and finer fps control
 Rem than tdiff, which is limited to centiseconds.
 
- If not exist "%TEMP%\%~n0_Delay.cmd" >"%TEMP%\%~n0_Delay.cmd" (
-  Title 1st Run Setup - FPS Baseline 1
-  Call:GetDelay D1
-  Title 1st Run Setup - FPS Baseline 2
-  Call:GetDelay D2
-  Title 1st Run Setup - FPS Baseline 3
-  Call:GetDelay D3
-  Title 1st Run Setup - FPS Baseline 4
-  Call:GetDelay D4
-  (Title )
-  Set /A "InitDelay=(D1+D2+D3+D4)/4"
-  Call Echo(@Set /A InitDelay=%%InitDelay%%
-  Echo(@Goto:Eof
+ Call "%TEMP%\%~n0_Delay.cmd" 2>nul || (
+	>"%TEMP%\%~n0_Delay.cmd" (
+		For /l %%i in (1 1 4)Do (
+			Title 1st Run Setup - FPS Baseline %%i
+			Call:GetDelay D%%i
+		)
+		(Title )
+		Set /A "InitDelay=(D1+D2+D3+D4)/4"
+		Call Echo(@Set /A InitDelay=%%InitDelay%%
+		Echo(@Exit /b 0
+ 	)
  )
 
- Call "%TEMP%\%~n0_Delay.cmd"
-
+REM change codepage to facilitate utf-8 characters used by script
  CHCP 65001 > nul
 
+REM confirm environment type suitable for macro definitions
  If "!!"=="" (
  	Echo(Delayed Expansion must be disabled prior to starting %~n0
  	Exit /b 1
  )
 
- Call:TestVT || (
+ Set "SkipVTtest="
+ Where Powershell.exe > nul
+ If Errorlevel 1 (
+	Powershell required to confirm Escape sequence support.
+	Choice /C:YN /M "Skip Validation {This script May not work as intended} [Y]es [N]o?"
+	If Errorlevel 2 (
+		Endlocal
+		Goto:Eof
+	)
+	Set "SkipVTtest=true"
+	CLS
+ ) 
+
+ If not defined SkipVTtest Call:TestVT || (%= Function tests vt sequence support =%
  	Echo(Virtual terminal sequences not supported
  	Exit /b 1
  )
@@ -98,49 +126,86 @@ REM Patrol sprites String definition, animation array, Starting frame and Array 
  Call:DefSprite "!Patrollers[%%%%c]!"	Height/2-16 Width/2-2 2 2 "230;!RandGG!;240"	  "!BG!" 3
  Call:DefSprite "!Patrollers[%%%%c]!"	Height/2+16 Width/2+2 2 2 "250;!RandGG!;240"	  "!BG!" 4
 
+REM Assign actions to controls, indexed by Direction.
+
+ REM Define player sprite movement macros
+ 	Set "Right=Set /A "1/((S1RB)/(S1X))" && Set /A "S1LX=S1X","S1LY=S1Y","S1X+=1" ||Set /A "S1LX=S1X","S1LY=S1Y""
+	Set "Left= Set /A "1/(S1LB-S1X)"     && Set /A "S1LX=S1X","S1LY=S1Y","S1X-=1" ||Set /A "S1LX=S1X","S1LY=S1Y""
+	Set "Up=   Set /A "1/(S1UB-S1Y)"     && Set /A "S1LX=S1X","S1LY=S1Y","S1Y-=1" ||Set /A "S1LX=S1X","S1LY=S1Y""
+	Set "Down= Set /A "1/(S1BB/S1Y)"     && Set /A "S1LX=S1X","S1LY=S1Y","S1Y+=1" ||Set /A "S1LX=S1X","S1LY=S1Y""
+	Set "Jump= Set /A "1/(S1BB/(S1Y+1))" || (Set /A "S1LX=S1X","S1LY=S1Y","S1Y-=10")"
+
+ REM Define non player sprite movement macros
+	Set sRight=Set /A "1/(S%%iRB/S%%iX)" ^&^& Set /A "S%%iLX=S%%iX","S%%iLY=S%%iY","S%%iX+=1" ^|^|Set /A "S%%iLX=S%%iX","S%%iLY=S%%iY"
+	Set sLeft= Set /A "1/(S%%iLB-S%%iX)" ^&^& Set /A "S%%iLX=S%%iX","S%%iLY=S%%iY","S%%iX-=1" ^|^|Set /A "S%%iLX=S%%iX","S%%iLY=S%%iY"
+	Set sUp=   Set /A "1/(S%%iUB-S%%iY)" ^&^& Set /A "S%%iLX=S%%iX","S%%iLY=S%%iY","S%%iY-=1" ^|^|Set /A "S%%iLX=S%%iX","S%%iLY=S%%iY"
+	Set sDown= Set /A "1/(S%%iBB/S%%iY)" ^&^& Set /A "S%%iLX=S%%iX","S%%iLY=S%%iY","S%%iY+=1" ^|^|Set /A "S%%iLX=S%%iX","S%%iLY=S%%iY"
+
+ Setlocal EnableDelayedExpansion
+
+Rem Choice or Xcopy controllers available by Changing REM position of TypeOfControl definition below.
+
+REM Control Scheme and Key assignments.
+REM XCOPY offers more Keys and therefor more control options, Choice is faster - allowing marginally smoother gameplay
+REM 	(Set "TypeOfControl=CHOICE"	& Set "QUITKEY=L")
+	(Set "TypeOfControl=XCOPY" 	& Set "QUITKEY=%TAB%")
+
+ If not defined TypeOfControl (
+	CLS
+	Echo( Controller type must be defined. Valid: CHOICE or XCOPY
+	Exit /b 1
+ )Else (
+	%SystemRoot%\System32\Findstr.exe /BIL ":!TypeOfControl!controller" "%~f0" > nul
+	If Errorlevel 1 (
+		CLS
+		Echo( Controller type Invalid. Must be defined as Either CHOICE or XCOPY
+		Exit /b 1
+ 	)
+ )
+
+REM confirm control utility present. If not abort with errorlevel 1
+ If defined Type of Control 1> nul Where %TypeOfControl%.exe
+ If Errorlevel 1 Exit /B 1
+
 REM Control Key assignments.
+REM expands input !k%%i!, where %%i is the key pressed. XCOPYcontroller Exceptions: k{ENTER} ; k{BACKSPACE} (unasssigned)
  Set "kD=Right" & Set "k6=Right"
  Set "kA=Left"  & Set "k4=Left"
  Set "kW=Up"    & Set "k8=Up"
  Set "kS=Down"  & Set "k2=Down"
- Set "kP=Pause" & Set "Pause=1"
-
-REM Define player sprite movement macros
- Set "Right=Set /A "1/((S1RB)/(S1X))" && Set /A "S1LX=S1X","S1LY=S1Y","S1X+=1" ||Set /A "S1LX=S1X","S1LY=S1Y""
- Set "Left= Set /A "1/(S1LB-S1X)"     && Set /A "S1LX=S1X","S1LY=S1Y","S1X-=1" ||Set /A "S1LX=S1X","S1LY=S1Y""
- Set "Up=   Set /A "1/(S1UB-S1Y)"     && Set /A "S1LX=S1X","S1LY=S1Y","S1Y-=1" ||Set /A "S1LX=S1X","S1LY=S1Y""
- Set "Down= Set /A "1/(S1BB/S1Y)"     && Set /A "S1LX=S1X","S1LY=S1Y","S1Y+=1" ||Set /A "S1LX=S1X","S1LY=S1Y""
- Set "Jump= Set /A "1/(S1BB/(S1Y+1))" || (Set /A "S1LX=S1X","S1LY=S1Y","S1Y-=10")"
-
-REM Define non player sprite movement macros
- Set sRight=Set /A "1/(S%%iRB/S%%iX)" ^&^& Set /A "S%%iLX=S%%iX","S%%iLY=S%%iY","S%%iX+=1" ^|^|Set /A "S%%iLX=S%%iX","S%%iLY=S%%iY"
- Set sLeft= Set /A "1/(S%%iLB-S%%iX)" ^&^& Set /A "S%%iLX=S%%iX","S%%iLY=S%%iY","S%%iX-=1" ^|^|Set /A "S%%iLX=S%%iX","S%%iLY=S%%iY"
- Set sUp=   Set /A "1/(S%%iUB-S%%iY)" ^&^& Set /A "S%%iLX=S%%iX","S%%iLY=S%%iY","S%%iY-=1" ^|^|Set /A "S%%iLX=S%%iX","S%%iLY=S%%iY"
- Set sDown= Set /A "1/(S%%iBB/S%%iY)" ^&^& Set /A "S%%iLX=S%%iX","S%%iLY=S%%iY","S%%iY+=1" ^|^|Set /A "S%%iLX=S%%iX","S%%iLY=S%%iY"
-
- Setlocal EnableDelayedExpansion
+ Set "kP=Pause" & Set "Pause=1" & Set "k =Pause" & Set "k{ENTER}=Pause"
 
  Echo(Survive^^^!
  Call:PlayMusic "%WINDIR%\Media\windows unlock.wav" 70
 
- Set "Title=Move: W A S D Quit: 'L'.  Turns Survived: ^!turn^!"
+ Set "Title=Move: W A S D Quit: '^!QuitKey:%TAB%=TAB^!'.  Turns Survived: ^!turn^!"
 
  Mode %Width%,%Height%
- Title %Title%
+
  Set /A "Delay=InitDelay","DelayReduce=InitDelay/50","DelayEnd=DelayReduce-1","frames=0","RandBB=!Random! %% 130 + 120","RandGG=!Random! %% 130 + 120","RandRR=!Random! %% 70 + 60"
 
  For /F "tokens=1,2,3 Delims=;" %%b in ("!bladesSTEP!;!PatrolSTEP!;!hunterSTEP!")Do Echo(%\E%[?25l%\E%[1;1H%\E%[48;2;!BG!m%\E%[38;2;!FG!m%\E%[2J%Sprite[1]%%Sprite[2]%%Sprite[3]%%Sprite[4]%%Sprite[5]%%Sprite[6]%%Sprite[7]%%Sprite[8]%%Sprite[9]%%Sprite[10]%%Sprite[11]%%Sprite[12]%%Sprite[13]%%Sprite[14]%%Sprite[15]%%Sprite[16]%%Sprite[17]%%Sprite[18]%
 
-Rem Use control function as input to game via pipline.
+REM Pipe the output of the function *CONTROLLER to Game to facilitate non blocking input.
+ Start /Wait /B "" "%~F0" %TypeOfControl%CONTROLLER 1>"%SignalFile%" | "%~F0" GAME <"%SignalFile%" 2> nul
 
- "%~F0" CONTROL W >"%temp%\%~n0_signal.txt" | "%~F0" GAME <"%temp%\%~n0_signal.txt"
- EXIT
+	CALL "%TEMP%\%~n0_restore.cmd"
+	DEL "%TEMP%\%~n0_restore.cmd"
+	CLS & (Title )
+	Choice /C:PE /M "[E]xit [P]lay again"
+	If Errorlevel 2 Goto:Eof
+
+Endlocal & Goto:Start
+
 
  :GAME
+
  Setlocal EnableDelayedExpansion
- <nul Set /p "=%\E%[?25l"
- 2> nul (				%= Suppress STDERR of conditional equations =%
- 	For /l %%. in () Do (	%= Enact Infinite Loop =%
+ Title %Title%
+
+ <nul Set /p "=%\E%[?25l"	%= Supress cursor indicator =%
+
+ 	For /l %%. in () Do (%= Enact Infinite Loop =%
 			
 		For /l %%# in (1 1 !Delay!) Do Rem %= Implement Delay Timing. =%
 
@@ -203,10 +268,12 @@ Rem Use control function as input to game via pipline.
 						Call:PlayMusic "%Windir%\media\Windows Error.wav" 70
 
 						%= Clear the console and environment and start a new game in the same window. =%
-						Cls
-						(Title )
+						
+						Break >"%SignalFile:Signal=Stop%"
+						If "%TypeOfController%" == "XCOPY" (
+							Title Press Enter to continue
+						)Else Title Press C to continue
 						Endlocal & Endlocal
-						Start /b "" "%~f0"
 						EXIT
 					)
 				)
@@ -222,9 +289,9 @@ Rem Use control function as input to game via pipline.
 		If not "!Lastkey!"=="Pause" Set "LastKey=!Key!"
 		Set "NewKey="
 		Set /P "NewKey="
-		If Defined NewKey For %%v in (!NewKey!)Do (
+		If Defined NewKey For /f "delims=" %%v in ("!NewKey!")Do (
 			If not "!k%%v!"=="" Set "key=!k%%v!"
-			If %%v == L EXIT
+			If /I "%%v" == "quit" EXIT
 		)
 
 		%= Implement Control actions. =%
@@ -232,7 +299,7 @@ Rem Use control function as input to game via pipline.
 			If "!Key!"=="Pause" (
 				Set /A "!Key!=!Pause! %%2 +1"
 				Set "Key="
-				If !Pause! EQU 1 Set "Key=!LastKey!"
+				If not "!Key!" == "Pause" Set "Key=!LastKey!"
 			)
 			If not !Pause! EQU 2 (
 				If "!Key!"=="Up" (
@@ -253,8 +320,8 @@ Rem Use control function as input to game via pipline.
 				)
 			)
 
-			%= Notify Controls + info via title =%
-			Title %Title% Speed !Speed!%% !Time:~-6! %Time:~-6%
+			%= Notify Controls + demo info via title =%
+			Title %Title% Speed !Speed!%% !Time:~-6! %Time:~-6% +!Key!+
 		)
 
 		For /F "tokens=1,2,3 Delims=;" %%b in ("!bladesSTEP!;!PatrolSTEP!;!hunterSTEP!")Do Echo(%\E%[1;1H%\E%[48;2;!BG!m%\E%[38;2;!FG!m%\E%[0J%Sprite[1]%%Sprite[2]%%Sprite[3]%%Sprite[4]%%Sprite[5]%%Sprite[6]%%Sprite[7]%%Sprite[8]%%Sprite[9]%%Sprite[10]%%Sprite[11]%%Sprite[12]%%Sprite[13]%%Sprite[14]%%Sprite[15]%%Sprite[16]%%Sprite[17]%%Sprite[18]%
@@ -262,7 +329,6 @@ Rem Use control function as input to game via pipline.
 		%= Alternate Thruster character definition for animation =%
 		Set "Thruster=▼"
 	)
- )
 
 ===============================================================
 
@@ -293,8 +359,6 @@ Exit /b 0
  REM              by assessing which character occupies the buffer cell the cursor is currently positioned at.
  REM              As this method is slow, an ADS of this file or a temporary file is used to remember if virtual terminal supported
  Cls
-
- For /f "delims=" %%e in ('Echo(Prompt $E^|cmd')Do set "\E=%%e"
 
  2> nul (
 	Set "NTFSdrive=true"
@@ -327,12 +391,12 @@ Exit /b 0
 
 ===============================================================
 
-:playMusic
+:playMusic <filepath.ext> [0~100] [nowait]
 	If "%~1" == "" (
 		Echo Play Music Usage:
 		Echo/Parameters required For Player: "filepath.ext" 0-100
 		pause
-		Exit /B
+		Exit /B 1
 	)
 
 	Set "MusicPath=%~1"
@@ -342,7 +406,7 @@ Exit /b 0
 	If not Exist "%~1" Exit /b 1
 
 Rem Creates a vbs Script to play audio
-	>"%~dp0Play%~3_mp3.vbs" (
+	>"%~dp0Play_mp3.vbs" (
 		echo Set Sound = CreateObject^("WMPlayer.OCX.7"^)
 		echo Sound.URL = "%MusicPath%"
 		echo Sound.settings.volume = %vol%
@@ -355,10 +419,30 @@ Rem Creates a vbs Script to play audio
 	If "%~3"=="" (
 		start /wait /min "" "%~dp0Play_mp3.vbs"
 	)Else (
-		start /min "" "%~dp0Play%~3_mp3.vbs"
+		start /min "" "%~dp0Play_mp3.vbs"
 	)
 
 Exit /b 0
+
+===============================================================
+
+:createChars
+(Set LF=^
+
+
+%= Do Not Modify. Linefeed Variable =%)
+
+%= Escape	=%		for /f "Delims=" %%e in ('Echo Prompt $E^|cmd') Do Set "\E=%%e"
+%= Tab	=%		for /f "delims= " %%T in ('robocopy /L . . /njh /njs' )do set "TAB=%%T"
+%= Carriage Return =%	for /f %%C in ('copy /Z "%~dpf0" nul') do set "CR=%%C"
+%= BackSpace	 =%	for /F "delims=#" %%B in ('"prompt #$H# &echo on &for %%b in (1) do rem"') do Set "BS=%%B"
+				Set "BS=%BS:~0,1%"
+%= SUB	=%		copy nul sub.tmp /a > nul
+				for /F %%a in (sub.tmp) DO (
+					set "sub=%%a"
+				)
+				del sub.tmp
+exit /b
 
 ===============================================================
 
@@ -385,15 +469,49 @@ REM faster gameplay
 
 ===============================================================
 
-:CONTROL
+:CHOICECONTROLLER
 FOR /L %%C in () do (
-	FOR /F "tokens=*" %%A in ('%SystemRoot%\System32\CHOICE.exe /C:abcdefghijklmnopqrstuvwxyz0123456789 /N') DO (
-		
-		<NUL SET /P ".=%%A"
-		If %%A == L (
+	FOR /F "tokens=*" %%A in ('%SystemRoot%\System32\choice.exe /C:abcdefghijklmnopqrstuvwxyz0123456789 /N') DO (
+
+		If Exist "%SignalFile:Signal=Stop%" (
+			EXIT
+		)
+
+		If not "%%A"=="%QUITKEY%" (
+			<Nul Set /P ".=%%A"
+		) Else (
+			<Nul Set /P ".=quit"
 			EXIT
 		)
 	)
 
 )
 EXIT
+
+:XCOPYCONTROLLER
+	Setlocal DISABLEdelayedExpansion
+	REM Environment handling allows use of ! key
+	For /l %%C in () do (
+		If Exist "%SignalFile:Signal=Stop%" (
+			EXIT
+		)
+		Set "Key="
+		for /f "delims=" %%A in ('%SystemRoot%\System32\xcopy.exe /w "%~f0" "%~f0" 2^>nul') do If not Defined Key (
+	      	set "key=%%A"
+			Setlocal ENABLEdelayedExpansion
+	      	set key=^!KEY:~-1!
+			If "!key!" == "!QUITKEY!" (
+				<nul Set /P "=quit"
+				EXIT
+			)
+			If not "!Key!" == "%BS%" If not "!Key!" == "!CR!" (%= Echo without Linefeed. Allows output of Key and Space =%
+				1> %~n0txt.tmp (echo(!Key!!sub!)
+				copy %~n0txt.tmp /a %~n0txt2.tmp /b > nul
+				type %~n0txt2.tmp
+				del %~n0txt.tmp %~n0txt2.tmp
+			)Else (
+				If "!Key!" == "%BS%" <nul Set /p "={BACKSPACE}"
+				If "!Key!" == "!CR!" <nul Set /p "={ENTER}"
+			)
+			Endlocal
+	)	)
