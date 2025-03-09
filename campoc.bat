@@ -1,9 +1,10 @@
-@Echo off & Setlocal EnableDelayedExpansion &CLS
+@Echo off
 
 IF not "%~1" == "" (
+    Setlocal EnableDelayedExpansion
     GOTO :%~1
 )
-
+Setlocal EnableDelayedExpansion
 CHCP 65001 > nul
 mode 100,45
 
@@ -40,9 +41,12 @@ If not exist "%TEMP%\%~n0demo.txt" (
   Set "East= 9 6 2 "
   Set /A Speed=24,minSpeed=12,Pause=1
 
-  Call:Radish_WAIT
+rem  Call:Radish_WAIT
+Set "CMDCMDLINE="
+Set /A "DPAD=6","lDPAD=6"
+2> NUL (
   For /l %%. in ()Do (
-    %$if.tElapse.GEQ.target:FPS=SPEED% (
+    %$if.tElapse.GEQ.target:FPS=SPEED% IF "!CMDCMDLINE:##=!" == "!CMDCMDLINE!" (
       FOR /F "tokens=1-4 delims=." %%R in ("!CMDCMDLINE!") DO (
         If %%T GTR 0 (
           Set "Pause=%%T" 
@@ -52,7 +56,7 @@ If not exist "%TEMP%\%~n0demo.txt" (
           )
         )
         Set "Keys=%%U"
-        Set /A "lM.Y=cM.Y","cM.Y=%%S","lM.X=cM.Y","cM.X=%%R","m.Button=%%T"
+        1>&2 Set /A "lM.Y=cM.Y","cM.Y=%%S","lM.X=cM.Y","cM.X=%%R","m.Button=%%T"
         If defined Keys If "!Controls:%%U=!"=="!Controls!" Set "Keys="
          If defined Keys (
           If not "!m.Button!"=="1" Set "Pause=1"
@@ -156,7 +160,8 @@ If not exist "%TEMP%\%~n0demo.txt" (
         )
       )
       If not !Pause! EQU 2 If Defined c.mode Set /A "!c.mode!"
-      TITLE [!DPAD!:!lDPAD!:!PAUSE! QUIT:esc MOVE: 123 46 789 Speed:5 !SPEED!] X=!c.X! ^| Y1=!c.Y1! ^| c.Y!c.H!=!c.Y%c.H%!
+             %=   control info   =%  %= mouse pos =%                                          %= camera position relative map 0;0 =%
+      TITLE [!LDPAD!:!DPAD!:!PAUSE!] [!cM.X!:!cM.Y!] QUIT:esc MV: 12346789 Speed:5 !SPEED!] X=!c.X! ^| Y1=!c.Y1! ^| c.Y!c.H!=!c.Y%c.H%!
       Set /A "tDiff=0","FRAME=0"
       %$Refresh.Camera%
       Echo(!Camera.View!
@@ -164,7 +169,7 @@ If not exist "%TEMP%\%~n0demo.txt" (
     )
   )
 )
-
+)
 Exit /b 0
 
 :Defmacros
@@ -342,17 +347,33 @@ for /f %%! in ("! ! ^^^!")Do ^
 Set "$Unload.Camera=Set $Unload.Camera=&Set $Make.Camera=&Set $Modify.Camera=&Set $Refresh.Camera=&Set $if.tElapse.GEQ.targetFPS="
 Exit /b 0
 
-:RADISH
-where radish.exe 2>&1 > nul || Echo( Requires Radish.exe by TheLowSunOverTheMoon. && Exit /b 1
-IF exist "RADISH_READY" (DEL /F /Q "RADISH_READY")
-SET "RADISH_END=(TASKKILL /F /IM "RADISH.exe")>NUL & EXIT"
-RADISH "%~nx0" %~1
+:RADISH AUTHOR: theLowSunOverTheMoon
+SET /A "RADISH_ID=RADISH_INDEX=0" & SET "RADISH_AUDIO_START=ECHO " & SET "RADISH_AUDIO_END=>\\.\pipe\RADISH" & SET "RADISH_END=(TASKKILL /F /IM "RADISH.exe")>NUL & EXIT"
+Where radish.exe > nul || (
+  Echo( required utility Radish.exe missing.
+  Echo( https://github.com/thelowsunoverthemoon/radish/blob/main/bin/radish.exe
+  Echo( https://github.com/thelowsunoverthemoon/radish/blob/main/bin/fmod.dll
+  Pause
+  Exit /b 1
+)
+2> nul RADISH "%~nx0" %~1
 GOTO :EOF
 :RADISH_WAIT 
-IF exist "RADISH_READY" (DEL /F /Q "RADISH_READY" & GOTO :EOF)
-(TIMEOUT /T 1)>NUL
+(ECHO/ > \\.\pipe\RADISH) 2>NUL && GOTO :EOF
+(PATHPING 127.0.0.1 -n -q 1 -p 150)>NUL
 GOTO :RADISH_WAIT
-
+:RADISH_ADD <name> <var> <type> 
+(PATHPING 127.0.0.1 -n -q 1 -p 100)>NUL & SET /A "%2=RADISH_INDEX", "RADISH_INDEX+=1"
+IF "%3" == "EFFECT" (%RADISH_AUDIO_START% "E#%~1" %RADISH_AUDIO_END%) else IF "%3" == "TRACK" (%RADISH_AUDIO_START% "T#%~1" %RADISH_AUDIO_END%) else IF "%3" == "OBJECT" (%RADISH_AUDIO_START% "O#%~1" %RADISH_AUDIO_END%)
+(PATHPING 127.0.0.1 -n -q 1 -p 100)>NUL
+GOTO :EOF
+:RADISH_CREATE_OBJ <index> <var> <x> <y>
+(PATHPING 127.0.0.1 -n -q 1 -p 100)>NUL
+SET /A "RADISH_ID-=1", "%2=RADISH_ID" & %RADISH_AUDIO_START% "C#%1#%3#%4" %RADISH_AUDIO_END% & (PATHPING 127.0.0.1 -n -q 1 -p 100)>NUL
+GOTO :EOF
+:RADISH_SET_OBS <x> <y>
+(PATHPING 127.0.0.1 -n -q 1 -p 100)>NUL & %RADISH_AUDIO_START% "X#%1#%2" %RADISH_AUDIO_END% & (PATHPING 127.0.0.1 -n -q 1 -p 100)>NUL
+GOTO :EOF
 0     // /  |           @   //  /  |                  ., `                                                                                                            || 
 0    / \/   |           I  /  \/   |               ..`    ```.,                  .___.                                                                                || 
 0   |   |+H+H+H+H+H+H+H+H+H|   |   /            ...            `..              +(   )|                                                                               {} 
